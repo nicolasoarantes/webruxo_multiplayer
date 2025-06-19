@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 3000;
 // Estrutura de dados para partidas (salas)
 const rooms = {};
 const MAX_PLAYERS = 3;
-let WAVE_INTERVAL = 20000; // 20 segundos entre waves
+let WAVE_INTERVAL = 5000; // 5 segundos entre waves
 let GAME_SPEED = 1; // 1x normal, 2x acelerado
 const ENEMIES_PER_WAVE_BASE = 5;
 const MAX_WAVES = 10;

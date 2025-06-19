@@ -5,6 +5,7 @@
 const canvas = document.getElementById('gameCanvas');
 const mainMenu = document.getElementById('mainMenu');
 const playBtn = document.getElementById('playBtn');
+const soloBtn = document.getElementById('soloBtn');
 const speedToggle = document.getElementById('speedToggle');
 const optionsMenu = document.getElementById('optionsMenu');
 const restartBtn = document.getElementById('restartBtn');
@@ -13,9 +14,18 @@ const closeMenuBtn = document.getElementById('closeMenuBtn');
 const infoDiv = document.getElementById('info');
 const renderer = new THREE.WebGLRenderer({ canvas });
 renderer.setSize(window.innerWidth, window.innerHeight);
+const WAVE_INTERVAL = 5000; // Deve coincidir com server.js
 
 // Menu inicial: só mostra o jogo após clicar em Jogar
 playBtn.onclick = () => {
+    mainMenu.style.display = 'none';
+    canvas.style.display = '';
+    infoDiv.style.display = '';
+    towerBar.style.display = '';
+    statusBar.style.display = '';
+};
+
+soloBtn.onclick = () => {
     mainMenu.style.display = 'none';
     canvas.style.display = '';
     infoDiv.style.display = '';
