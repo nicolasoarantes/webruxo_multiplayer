@@ -31,11 +31,17 @@ const ENEMY_TYPES = [
     { type: 'tank', hp: 60, speed: 0.012, damage: 20, reward: 20 },
 ];
 
-// Waypoints simples para os inimigos seguirem até a base central
-const WAYPOINTS = [
-    { x: -10, z: 10 },
-    { x: 0, z: 0 }, // base central
-];
+// Formas visuais possíveis para os inimigos
+const ENEMY_SHAPES = ['sphere', 'cube', 'pyramid'];
+
+// Gera caminho individual para cada inimigo
+function generatePath() {
+    return [
+        { x: (Math.random() - 0.5) * 10, z: (Math.random() - 0.5) * 10 },
+        { x: (Math.random() - 0.5) * 6, z: (Math.random() - 0.5) * 6 },
+        { x: 0, z: 0 }, // base
+    ];
+}
 
 // Função utilitária para gerar posição inicial dos inimigos
 function getEnemySpawnPosition(typeObj) {
@@ -45,11 +51,13 @@ function getEnemySpawnPosition(typeObj) {
     return {
         x: Math.cos(angle) * radius,
         z: Math.sin(angle) * radius,
+        path: generatePath(),
         waypointIndex: 0,
         hp: typeObj.hp,
         maxHp: typeObj.hp,
         speed: typeObj.speed,
         type: typeObj.type,
+        shape: ENEMY_SHAPES[Math.floor(Math.random() * ENEMY_SHAPES.length)],
         damage: typeObj.damage,
         reward: typeObj.reward,
         id: Math.random().toString(36).substr(2, 9),
@@ -97,13 +105,13 @@ function spawnWave(room) {
 // Lógica de movimentação dos inimigos
 function updateEnemies(room) {
     for (const enemy of room.enemies) {
-        const wp = WAYPOINTS[enemy.waypointIndex];
+        const wp = enemy.path[enemy.waypointIndex];
         if (!wp) continue;
         const dx = wp.x - enemy.x;
         const dz = wp.z - enemy.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
         if (dist < 0.2) {
-            if (enemy.waypointIndex < WAYPOINTS.length - 1) {
+            if (enemy.waypointIndex < enemy.path.length - 1) {
                 enemy.waypointIndex++;
             } else {
                 // Chegou na base

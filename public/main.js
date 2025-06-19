@@ -6,6 +6,10 @@ const canvas = document.getElementById('gameCanvas');
 const mainMenu = document.getElementById('mainMenu');
 const playBtn = document.getElementById('playBtn');
 const speedToggle = document.getElementById('speedToggle');
+const optionsMenu = document.getElementById('optionsMenu');
+const restartBtn = document.getElementById('restartBtn');
+const toggleSpeedBtn = document.getElementById('toggleSpeedBtn');
+const closeMenuBtn = document.getElementById('closeMenuBtn');
 const infoDiv = document.getElementById('info');
 const renderer = new THREE.WebGLRenderer({ canvas });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -18,13 +22,36 @@ playBtn.onclick = () => {
     towerBar.style.display = '';
     statusBar.style.display = '';
 };
+
+// Opções de menu em jogo
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        optionsMenu.style.display = optionsMenu.style.display === 'flex' ? 'none' : 'flex';
+    }
+});
+restartBtn.onclick = () => { location.reload(); };
+toggleSpeedBtn.onclick = () => {
+    speedToggle.checked = !speedToggle.checked;
+    socket.emit('speed_toggle', { fast: speedToggle.checked });
+};
+closeMenuBtn.onclick = () => { optionsMenu.style.display = 'none'; };
 // Esconde UI do jogo até clicar em Jogar
 canvas.style.display = 'none';
 infoDiv.style.display = 'none';
 let towerBar, statusBar;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x222233);
+scene.background = new THREE.Color(0x1e2438);
+// Fundo com estrelas
+const starGeo = new THREE.BufferGeometry();
+const starVerts = [];
+for (let i = 0; i < 1000; i++) {
+    starVerts.push((Math.random() - 0.5) * 200, 20 + Math.random() * 80, (Math.random() - 0.5) * 200);
+}
+starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3));
+const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.7 });
+const stars = new THREE.Points(starGeo, starMat);
+scene.add(stars);
 
 // Câmera perspectiva
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
@@ -36,10 +63,21 @@ scene.add(new THREE.AmbientLight(0xffffff, 0.7));
 
 // Chão simples
 const groundGeo = new THREE.PlaneGeometry(40, 40);
-const groundMat = new THREE.MeshPhongMaterial({ color: 0x444466 });
+const groundMat = new THREE.MeshPhongMaterial({ color: 0x353a50 });
 const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI / 2;
 scene.add(ground);
+const gridHelper = new THREE.GridHelper(40, 40, 0x444477, 0x444477);
+scene.add(gridHelper);
+
+// Caminhos no chão
+const pathMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
+const cross1 = new THREE.Mesh(new THREE.BoxGeometry(28, 0.05, 4), pathMat);
+cross1.position.y = 0.025;
+scene.add(cross1);
+const cross2 = cross1.clone();
+cross2.rotation.y = Math.PI / 2;
+scene.add(cross2);
 
 // Base central
 const baseGeo = new THREE.CylinderGeometry(1.5, 1.5, 1, 32);
@@ -47,6 +85,12 @@ const baseMat = new THREE.MeshPhongMaterial({ color: 0xffcc00 });
 const base = new THREE.Mesh(baseGeo, baseMat);
 base.position.set(0, 0.5, 0);
 scene.add(base);
+const ringGeo = new THREE.RingGeometry(3, 3.8, 32);
+const ringMat = new THREE.MeshPhongMaterial({ color: 0x666666, side: THREE.DoubleSide });
+const ring = new THREE.Mesh(ringGeo, ringMat);
+ring.rotation.x = -Math.PI / 2;
+ring.position.y = 0.051;
+scene.add(ring);
 
 // === Socket.io ===
 const socket = io();
@@ -86,6 +130,7 @@ function updateHitEffects() {
 }
 const towerMeshes = [];
 const shotParticles = [];
+const shotTrails = [];
 
 // Info UI moderna (barra superior)
 infoDiv.style.position = 'absolute';
@@ -281,7 +326,10 @@ function updateEnemies() {
             color += parseInt(enemy.id.substr(-2), 36) * 1000 % 0x10000;
         }
         const scale = 0.6 + (enemy.type === 'tank' ? 0.3 : 0) + ((enemy.id ? parseInt(enemy.id[0],36)%3 : 0)*0.07);
-        const geo = new THREE.SphereGeometry(scale, 12, 12);
+        let geo;
+        if (enemy.shape === 'cube') geo = new THREE.BoxGeometry(scale*1.2, scale*1.2, scale*1.2);
+        else if (enemy.shape === 'pyramid') geo = new THREE.ConeGeometry(scale, scale*1.6, 4);
+        else geo = new THREE.SphereGeometry(scale, 12, 12);
         const mat = new THREE.MeshPhongMaterial({ color });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.position.set(enemy.x, scale, enemy.z);
@@ -316,6 +364,14 @@ function updateEnemies() {
     }
     for (let i = shotParticles.length-1; i >= 0; i--) {
         if (shotParticles[i].life <= 0) shotParticles.splice(i,1);
+    }
+    // Trilhas de tiro
+    for (const t of shotTrails) {
+        t.mesh.material.opacity -= 0.1;
+        if (t.mesh.material.opacity <= 0) scene.remove(t.mesh);
+    }
+    for (let i = shotTrails.length-1; i >= 0; i--) {
+        if (shotTrails[i].mesh.material.opacity <= 0) shotTrails.splice(i,1);
     }
 }
 
@@ -436,6 +492,12 @@ socket.on('game_update', (data) => {
             mesh.position.copy(from);
             scene.add(mesh);
             shotParticles.push({mesh, dir, speed:0.45, life:12});
+            // Linha de trajetória
+            const lineGeo = new THREE.BufferGeometry().setFromPoints([from, to]);
+            const lineMat = new THREE.LineBasicMaterial({ color: 0xffee88, transparent:true, opacity:0.8 });
+            const line = new THREE.Line(lineGeo, lineMat);
+            scene.add(line);
+            shotTrails.push({mesh: line});
         }
     }
 });
