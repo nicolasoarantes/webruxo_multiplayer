@@ -201,17 +201,13 @@ setInterval(() => {
         room.events = [];
     }
 }, 50); // 20 FPS
-// Evento para acelerar/desacelerar o tempo
-io.on('connection', (socket) => {
-    // ...existing code...
-    socket.on('speed_toggle', (data) => {
-        GAME_SPEED = data.fast ? 2 : 1;
-    });
-    // ...existing code...
-});
 
 // Gerenciamento de conexões Socket.io
 io.on('connection', (socket) => {
+    // Permite acelerar/desacelerar o tempo de jogo por cliente
+    socket.on('speed_toggle', (data) => {
+        GAME_SPEED = data.fast ? 2 : 1;
+    });
     let joinedRoom = null;
     // Encontrar ou criar sala com vaga
     for (const [roomId, room] of Object.entries(rooms)) {
