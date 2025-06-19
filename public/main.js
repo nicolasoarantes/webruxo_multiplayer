@@ -6,6 +6,7 @@ const canvas = document.getElementById('gameCanvas');
 const mainMenu = document.getElementById('mainMenu');
 const playBtn = document.getElementById('playBtn');
 const speedToggle = document.getElementById('speedToggle');
+const infoDiv = document.getElementById('info');
 const renderer = new THREE.WebGLRenderer({ canvas });
 renderer.setSize(window.innerWidth, window.innerHeight);
 
@@ -55,6 +56,7 @@ let roomId = null;
 let enemies = [];
 let baseHp = 1000;
 let wave = 0;
+let towers = [];
 
 // Mapas para objetos Three.js
 const enemyMeshes = [];
@@ -86,7 +88,6 @@ const towerMeshes = [];
 const shotParticles = [];
 
 // Info UI moderna (barra superior)
-const infoDiv = document.getElementById('info');
 infoDiv.style.position = 'absolute';
 infoDiv.style.top = '2vh';
 infoDiv.style.left = '50%';
