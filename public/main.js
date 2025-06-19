@@ -41,8 +41,7 @@ infoDiv.style.display = 'none';
 let towerBar, statusBar;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1e2438);
-// Fundo com estrelas
+scene.background = new THREE.Color(0x1e2438)// Fundo com estrelas
 const starGeo = new THREE.BufferGeometry();
 const starVerts = [];
 for (let i = 0; i < 1000; i++) {
@@ -52,6 +51,7 @@ starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3))
 const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.7 });
 const stars = new THREE.Points(starGeo, starMat);
 scene.add(stars);
+
 
 // Câmera perspectiva
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
@@ -78,6 +78,7 @@ scene.add(cross1);
 const cross2 = cross1.clone();
 cross2.rotation.y = Math.PI / 2;
 scene.add(cross2);
+
 
 // Base central
 const baseGeo = new THREE.CylinderGeometry(1.5, 1.5, 1, 32);
