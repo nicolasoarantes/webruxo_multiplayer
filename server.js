@@ -26,9 +26,9 @@ const MAX_WAVES = 10;
 const BASE_INITIAL_HP = 100;
 const BASE_INITIAL_RESOURCES = 500;
 const ENEMY_TYPES = [
-    { type: 'basic', hp: 30, speed: 0.018, damage: 10, reward: 10 },
-    { type: 'fast', hp: 15, speed: 0.035, damage: 7, reward: 12 },
-    { type: 'tank', hp: 60, speed: 0.012, damage: 20, reward: 20 },
+    { type: 'wisp', hp: 30, speed: 0.018, damage: 10, reward: 10 },
+    { type: 'sombra', hp: 15, speed: 0.035, damage: 7, reward: 12 },
+    { type: 'golem', hp: 60, speed: 0.012, damage: 20, reward: 20 },
 ];
 
 // Formas visuais possíveis para os inimigos
@@ -158,9 +158,8 @@ setInterval(() => {
                     }
                     if (target) {
                         // Dano depende do tipo e nível
-                        let dmg = 8 + tower.level * 4;
-                        if (tower.type === 'cannon') dmg += 6;
-                        if (tower.type === 'magic') dmg = 5 + tower.level * 3;
+                        let dmg = 8 + tower.level * 4;                        if (tower.type === 'elemental') dmg += 6;
+                        if (tower.type === 'portal') dmg = 5 + tower.level * 3;
                         target.hp -= dmg;
                         // Evento de hit para feedback visual
                         room.events.push({ type: 'enemy_hit', id: target.id, dmg });
@@ -239,7 +238,7 @@ io.on('connection', (socket) => {
         const room = rooms[joinedRoom];
         if (!room || room.intervalActive !== true) return; // só pode construir entre waves
         // Custo por tipo
-        const towerTypes = { archer: 100, cannon: 150, magic: 120 };
+        const towerTypes = { crystal: 100, elemental: 150, portal: 120 };
         const cost = towerTypes[data.type] || 100;
         if (room.resources < cost) return;
         room.resources -= cost;

@@ -97,7 +97,6 @@ scene.add(ring);
 const socket = io();
 let playerId = null;
 let roomId = null;
-// ...existing code...
 let enemies = [];
 let baseHp = 1000;
 let wave = 0;
@@ -150,11 +149,35 @@ infoDiv.style.zIndex = 30;
 infoDiv.style.boxShadow = '0 2px 16px #0008';
 
 // UI para seleção de tipo de torre
-let selectedTowerType = 'archer';
+let selectedTowerType = 'crystal';
 const towerTypes = {
-    archer: { name: 'Arqueiro', color: 0x00ccff, cost: 100 },
-    cannon: { name: 'Canhão', color: 0xff8800, cost: 150 },
-    magic: { name: 'Magia', color: 0x9933ff, cost: 120 },
+    crystal: { 
+        name: 'Cristal Arcano', 
+        color: 0x00ccff, 
+        cost: 100,
+        description: 'Dispara rajadas de energia arcana. Ataque equilibrado e confiável.',
+        range: 8,
+        damage: '10-15',
+        rate: 'Rápido'
+    },
+    elemental: { 
+        name: 'Elemental', 
+        color: 0xff8800, 
+        cost: 150,
+        description: 'Alterna entre elementos para causar dano extra. Mais forte contra Golems.',
+        range: 6,
+        damage: '20-25',
+        rate: 'Médio'
+    },
+    portal: { 
+        name: 'Portal Rúnico', 
+        color: 0x9933ff, 
+        cost: 120,
+        description: 'Cria armadilhas mágicas que retardam inimigos. Escala bem com melhorias.',
+        range: 5,
+        damage: '8-20',
+        rate: 'Lento'
+    },
 };
 
 // Cria barra de seleção de torres (UI moderna)
@@ -163,27 +186,57 @@ towerBar.style.position = 'absolute';
 towerBar.style.right = '2vw';
 towerBar.style.top = '70px';
 towerBar.style.background = 'rgba(30,30,40,0.92)';
-towerBar.style.padding = '18px 18px 10px 18px';
-towerBar.style.borderRadius = '14px';
-towerBar.style.color = '#fff';
-towerBar.style.zIndex = 20;
-towerBar.style.boxShadow = '0 2px 16px #0008';
+towerBar.style.padding = '10px';
+towerBar.style.borderRadius = '12px';
+towerBar.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
 towerBar.style.display = 'none';
-towerBar.innerHTML = '<div style="font-size:1.2em;font-weight:bold;margin-bottom:8px;">Construir Torre</div>';
+
+// Adiciona botões de torre com tooltips
 for (const t in towerTypes) {
+    const tower = towerTypes[t];
     const btn = document.createElement('button');
-    btn.textContent = `${towerTypes[t].name} ($${towerTypes[t].cost})`;
-    btn.style.margin = '4px';
-    btn.style.padding = '8px 16px';
-    btn.style.borderRadius = '7px';
+    btn.textContent = `${tower.name} ($${tower.cost})`;
+    btn.style.display = 'block';
+    btn.style.width = '180px';
+    btn.style.padding = '8px';
+    btn.style.margin = '5px 0';
     btn.style.border = 'none';
+    btn.style.borderRadius = '6px';
     btn.style.background = '#222';
-    btn.style.color = '#fff';
-    btn.style.fontWeight = 'bold';
-    btn.style.fontSize = '1em';
+    btn.style.color = '#bbb';
     btn.style.cursor = 'pointer';
-    btn.onclick = () => { selectedTowerType = t; highlightTowerButtons(); };
-    btn.id = 'btn-tower-' + t;
+    btn.style.transition = 'all 0.2s ease';
+    btn.style.position = 'relative';
+
+    // Tooltip customizado
+    const tooltip = document.createElement('div');
+    tooltip.style.position = 'absolute';
+    tooltip.style.right = 'calc(100% + 10px)';
+    tooltip.style.top = '50%';
+    tooltip.style.transform = 'translateY(-50%)';
+    tooltip.style.background = 'rgba(20,20,30,0.95)';
+    tooltip.style.padding = '10px';
+    tooltip.style.borderRadius = '8px';
+    tooltip.style.width = '200px';
+    tooltip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+    tooltip.style.display = 'none';
+    tooltip.style.zIndex = '1000';
+    tooltip.innerHTML = `
+        <div style="color:#fff;font-weight:bold;margin-bottom:5px">${tower.name}</div>
+        <div style="color:#aaa;font-size:0.9em;margin-bottom:8px">${tower.description}</div>
+        <div style="color:#88ccff">Alcance: ${tower.range}</div>
+        <div style="color:#ffaa88">Dano: ${tower.damage}</div>
+        <div style="color:#88ff88">Velocidade: ${tower.rate}</div>
+    `;
+    btn.appendChild(tooltip);
+
+    btn.onmouseover = () => { tooltip.style.display = 'block'; };
+    btn.onmouseout = () => { tooltip.style.display = 'none'; };
+    btn.onclick = () => { 
+        selectedTowerType = t; 
+        highlightTowerButtons();
+        showTowerRange(t);
+    };
     towerBar.appendChild(btn);
 }
 document.body.appendChild(towerBar);
@@ -201,18 +254,85 @@ highlightTowerButtons();
 // Barra inferior para status de wave/intervalo (UI moderna)
 statusBar = document.createElement('div');
 statusBar.style.position = 'absolute';
-statusBar.style.bottom = '2vh';
 statusBar.style.left = '50%';
 statusBar.style.transform = 'translateX(-50%)';
+statusBar.style.top = '20px';
 statusBar.style.background = 'rgba(30,30,40,0.92)';
-statusBar.style.padding = '12px 32px';
-statusBar.style.borderRadius = '14px';
+statusBar.style.padding = '10px 20px';
+statusBar.style.borderRadius = '12px';
 statusBar.style.color = '#fff';
-statusBar.style.fontSize = '1.2em';
-statusBar.style.zIndex = 20;
-statusBar.style.boxShadow = '0 2px 16px #0008';
 statusBar.style.display = 'none';
+statusBar.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+statusBar.style.display = 'flex';
+statusBar.style.gap = '20px';
+statusBar.style.alignItems = 'center';
+statusBar.innerHTML = `
+    <div>
+        <span style="color:#ffcc00">Base HP: </span>
+        <span id="baseHp">100</span>
+    </div>
+    <div>
+        <span style="color:#88ff88">Recursos: </span>
+        <span id="resources">500</span>
+    </div>
+    <div>
+        <span style="color:#ff88ff">Wave: </span>
+        <span id="wave">0</span>
+    </div>
+    <div style="position:relative">
+        <span style="color:#88ccff">Próxima Wave: </span>
+        <span id="waveCountdown"></span>
+        <div id="waveProgress" style="position:absolute;bottom:-5px;left:0;height:2px;background:#88ccff;width:100%"></div>
+    </div>
+`;
 document.body.appendChild(statusBar);
+
+// Atualização do status com animações
+function updateStatus(gameState) {
+    const baseHpEl = document.getElementById('baseHp');
+    const resourcesEl = document.getElementById('resources');
+    const waveEl = document.getElementById('wave');
+    const waveCountdownEl = document.getElementById('waveCountdown');
+    const waveProgressEl = document.getElementById('waveProgress');
+
+    // Animate HP changes
+    if (baseHpEl.textContent !== gameState.baseHp.toString()) {
+        const oldHp = parseInt(baseHpEl.textContent);
+        const newHp = gameState.baseHp;
+        if (oldHp > newHp) {
+            baseHpEl.style.color = '#ff4444';
+            setTimeout(() => { baseHpEl.style.color = '#fff'; }, 500);
+        }
+        baseHpEl.textContent = newHp;
+    }
+
+    // Animate resource changes
+    if (resourcesEl.textContent !== gameState.resources.toString()) {
+        const oldRes = parseInt(resourcesEl.textContent);
+        const newRes = gameState.resources;
+        if (oldRes < newRes) {
+            resourcesEl.style.color = '#88ff88';
+            setTimeout(() => { resourcesEl.style.color = '#fff'; }, 500);
+        }
+        resourcesEl.textContent = newRes;
+    }
+
+    // Update wave info
+    waveEl.textContent = gameState.wave;
+    
+    // Wave countdown
+    const timeToNext = Math.max(0, Math.floor((gameState.intervalEnd - Date.now()) / 1000));
+    waveCountdownEl.textContent = timeToNext + 's';
+    const progress = Math.max(0, Math.min(1, timeToNext / (WAVE_INTERVAL / 1000)));
+    waveProgressEl.style.width = (progress * 100) + '%';
+    
+    if (timeToNext <= 5) {
+        waveCountdownEl.style.color = '#ff4444';
+    } else {
+        waveCountdownEl.style.color = '#fff';
+    }
+}
+
 // Acelerar tempo: envia evento ao servidor
 speedToggle.onchange = () => {
     socket.emit('speed_toggle', { fast: speedToggle.checked });
@@ -230,7 +350,6 @@ let resources = 0;
 let score = 0;
 let intervalActive = false;
 let intervalEnd = 0;
-// ...existing code...
 let gameOver = false;
 let victory = false;
 
@@ -319,14 +438,14 @@ function updateEnemies() {
     // Adiciona novos
     for (const enemy of enemies) {
         // Variação visual: cor e tamanho aleatório por id
-        let color = 0xff3333;
-        if (enemy.type === 'fast') color = 0x33ff99;
-        if (enemy.type === 'tank') color = 0x888888;
+        let color = 0xff3333;        if (enemy.type === 'sombra') color = 0x33ff99;
+        if (enemy.type === 'wisp') color = 0x88ffff;
+        if (enemy.type === 'golem') color = 0x888888;
         // Variação: cor levemente alterada por id
         if (enemy.id) {
             color += parseInt(enemy.id.substr(-2), 36) * 1000 % 0x10000;
         }
-        const scale = 0.6 + (enemy.type === 'tank' ? 0.3 : 0) + ((enemy.id ? parseInt(enemy.id[0],36)%3 : 0)*0.07);
+        const scale = 0.6 + (enemy.type === 'golem' ? 0.3 : (enemy.type === 'sombra' ? -0.2 : 0)) + ((enemy.id ? parseInt(enemy.id[0],36)%3 : 0)*0.07);
         let geo;
         if (enemy.shape === 'cube') geo = new THREE.BoxGeometry(scale*1.2, scale*1.2, scale*1.2);
         else if (enemy.shape === 'pyramid') geo = new THREE.ConeGeometry(scale, scale*1.6, 4);
@@ -518,6 +637,92 @@ function createTextMesh(text, color=0xffffff) {
     const sprite = new THREE.Sprite(mat);
     sprite.scale.set(1.2,0.6,1);
     return sprite;
+}
+
+// Tower range indicator
+let rangeIndicator = null;
+
+function showTowerRange(towerType) {
+    // Remove existing range indicator
+    if (rangeIndicator) {
+        scene.remove(rangeIndicator);
+        rangeIndicator = null;
+    }
+
+    const range = towerTypes[towerType].range;
+    const geometry = new THREE.RingGeometry(0, range, 32);
+    const material = new THREE.MeshBasicMaterial({ 
+        color: towerTypes[towerType].color,
+        transparent: true,
+        opacity: 0.2,
+        side: THREE.DoubleSide
+    });
+    rangeIndicator = new THREE.Mesh(geometry, material);
+    rangeIndicator.rotation.x = -Math.PI / 2;
+    rangeIndicator.position.y = 0.1;
+    scene.add(rangeIndicator);
+}
+
+// Tower attack effects
+function createAttackEffect(from, to, type) {
+    const points = [];
+    points.push(new THREE.Vector3(from.x, 1, from.z));
+    
+    // Add a slight arc to the attack
+    const mid = new THREE.Vector3(
+        (from.x + to.x) / 2,
+        1.5 + Math.random(),
+        (from.z + to.z) / 2
+    );
+    points.push(mid);
+    points.push(new THREE.Vector3(to.x, 1, to.z));
+
+    const curve = new THREE.QuadraticBezierCurve3(points[0], points[1], points[2]);
+    const geometry = new THREE.TubeGeometry(curve, 20, 0.1, 8, false);
+    
+    let color;
+    switch(type) {
+        case 'crystal':
+            color = 0x00ffff;
+            break;
+        case 'elemental':
+            // Cycle between elements
+            const elements = [0xff0000, 0x00ff00, 0x00ffff, 0xffff00];
+            color = elements[Math.floor(Math.random() * elements.length)];
+            break;
+        case 'portal':
+            color = 0xff00ff;
+            break;
+        default:
+            color = 0xffffff;
+    }
+
+    const material = new THREE.MeshBasicMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.7
+    });
+
+    const effect = new THREE.Mesh(geometry, material);
+    scene.add(effect);
+
+    // Animate and remove
+    const startTime = Date.now();
+    const duration = 500;
+    
+    function animate() {
+        const progress = (Date.now() - startTime) / duration;
+        if (progress >= 1) {
+            scene.remove(effect);
+            effect.geometry.dispose();
+            effect.material.dispose();
+            return;
+        }
+        
+        effect.material.opacity = 0.7 * (1 - progress);
+        requestAnimationFrame(animate);
+    }
+    animate();
 }
 
 // === Movimentação de câmera (orbita e zoom) ===
