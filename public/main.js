@@ -1,12 +1,9 @@
-// main.js
-// Cliente Three.js + Socket.io para protótipo Tower Defense multiplayer
-
-// === Configuração básica Three.js ===
+// Tower Guardians - Single Player
 const canvas = document.getElementById('gameCanvas');
 const mainMenu = document.getElementById('mainMenu');
 const playBtn = document.getElementById('playBtn');
-const soloBtn = document.getElementById('soloBtn');
 const speedToggle = document.getElementById('speedToggle');
+// statusBar already declared above
 const optionsMenu = document.getElementById('optionsMenu');
 const restartBtn = document.getElementById('restartBtn');
 const toggleSpeedBtn = document.getElementById('toggleSpeedBtn');
@@ -14,25 +11,21 @@ const closeMenuBtn = document.getElementById('closeMenuBtn');
 const infoDiv = document.getElementById('info');
 const renderer = new THREE.WebGLRenderer({ canvas });
 renderer.setSize(window.innerWidth, window.innerHeight);
-const WAVE_INTERVAL = 5000; // Deve coincidir com server.js
+// const WAVE_INTERVAL = 5000; // Already declared below
 
 // Menu inicial: só mostra o jogo após clicar em Jogar
+
 playBtn.onclick = () => {
     mainMenu.style.display = 'none';
     canvas.style.display = '';
-    infoDiv.style.display = '';
     towerBar.style.display = '';
     statusBar.style.display = '';
+    isGameRunning = true;
+    nextWaveTime = Date.now() + WAVE_INTERVAL;
+    animate();
 };
 
-soloBtn.onclick = () => {
-    mainMenu.style.display = 'none';
-    canvas.style.display = '';
-    infoDiv.style.display = '';
-    towerBar.style.display = '';
-    statusBar.style.display = '';
-};
-
+// soloBtn.onclick = ... (removed for single player)
 // Opções de menu em jogo
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -48,7 +41,7 @@ closeMenuBtn.onclick = () => { optionsMenu.style.display = 'none'; };
 // Esconde UI do jogo até clicar em Jogar
 canvas.style.display = 'none';
 infoDiv.style.display = 'none';
-let towerBar, statusBar;
+let towerBar;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1e2438)// Fundo com estrelas
@@ -103,289 +96,36 @@ ring.rotation.x = -Math.PI / 2;
 ring.position.y = 0.051;
 scene.add(ring);
 
-// === Socket.io ===
-const socket = io();
-let playerId = null;
-let roomId = null;
-let enemies = [];
-let baseHp = 1000;
+// Game state
+let isGameRunning = false;
+let baseHp = 100;
+let resources = 500;
 let wave = 0;
+let score = 0;
+let enemies = [];
 let towers = [];
+let gameSpeed = 1;
+// const WAVE_INTERVAL = 20000; // Already declared above
+let nextWaveTime = 0;
 
-// Mapas para objetos Three.js
-const enemyMeshes = [];
-const enemyHpBars = [];
-const enemyDmgTexts = [];
-const enemyHitFlashes = [];
-const hitParticles = [];
-// Atualização dos efeitos de hit
-function updateHitEffects() {
-    // Flashes de hit
-    for (const flash of enemyHitFlashes) {
-        flash.mesh.material.opacity -= 0.08;
-        if (flash.mesh.material.opacity <= 0) scene.remove(flash.mesh);
-    }
-    for (let i = enemyHitFlashes.length-1; i >= 0; i--) {
-        if (enemyHitFlashes[i].mesh.material.opacity <= 0) enemyHitFlashes.splice(i,1);
-    }
-    // Partículas de impacto
-    for (const p of hitParticles) {
-        p.mesh.position.add(p.dir.clone().multiplyScalar(p.speed));
-        p.mesh.material.opacity -= 0.07;
-        if (p.mesh.material.opacity <= 0) scene.remove(p.mesh);
-    }
-    for (let i = hitParticles.length-1; i >= 0; i--) {
-        if (hitParticles[i].mesh.material.opacity <= 0) hitParticles.splice(i,1);
-    }
-}
-const towerMeshes = [];
-const shotParticles = [];
-const shotTrails = [];
-
-// Info UI moderna (barra superior)
-infoDiv.style.position = 'absolute';
-infoDiv.style.top = '2vh';
-infoDiv.style.left = '50%';
-infoDiv.style.transform = 'translateX(-50%)';
-infoDiv.style.background = 'rgba(30,30,40,0.92)';
-infoDiv.style.padding = '12px 32px';
-infoDiv.style.borderRadius = '14px';
-infoDiv.style.color = '#fff';
-infoDiv.style.fontSize = '1.25em';
-infoDiv.style.fontFamily = 'Segoe UI, Arial, sans-serif';
-infoDiv.style.fontWeight = 'bold';
-infoDiv.style.letterSpacing = '1px';
-infoDiv.style.zIndex = 30;
-infoDiv.style.boxShadow = '0 2px 16px #0008';
-
-// UI para seleção de tipo de torre
-let selectedTowerType = 'crystal';
-const towerTypes = {
-    crystal: { 
-        name: 'Cristal Arcano', 
-        color: 0x00ccff, 
-        cost: 100,
-        description: 'Dispara rajadas de energia arcana. Ataque equilibrado e confiável.',
-        range: 8,
-        damage: '10-15',
-        rate: 'Rápido'
-    },
-    elemental: { 
-        name: 'Elemental', 
-        color: 0xff8800, 
-        cost: 150,
-        description: 'Alterna entre elementos para causar dano extra. Mais forte contra Golems.',
-        range: 6,
-        damage: '20-25',
-        rate: 'Médio'
-    },
-    portal: { 
-        name: 'Portal Rúnico', 
-        color: 0x9933ff, 
-        cost: 120,
-        description: 'Cria armadilhas mágicas que retardam inimigos. Escala bem com melhorias.',
-        range: 5,
-        damage: '8-20',
-        rate: 'Lento'
-    },
-};
-
-// Cria barra de seleção de torres (UI moderna)
-towerBar = document.createElement('div');
-towerBar.style.position = 'absolute';
-towerBar.style.right = '2vw';
-towerBar.style.top = '70px';
-towerBar.style.background = 'rgba(30,30,40,0.92)';
-towerBar.style.padding = '10px';
-towerBar.style.borderRadius = '12px';
-towerBar.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-towerBar.style.display = 'none';
-
-// Adiciona botões de torre com tooltips
-for (const t in towerTypes) {
-    const tower = towerTypes[t];
-    const btn = document.createElement('button');
-    btn.textContent = `${tower.name} ($${tower.cost})`;
-    btn.style.display = 'block';
-    btn.style.width = '180px';
-    btn.style.padding = '8px';
-    btn.style.margin = '5px 0';
-    btn.style.border = 'none';
-    btn.style.borderRadius = '6px';
-    btn.style.background = '#222';
-    btn.style.color = '#bbb';
-    btn.style.cursor = 'pointer';
-    btn.style.transition = 'all 0.2s ease';
-    btn.style.position = 'relative';
-
-    // Tooltip customizado
-    const tooltip = document.createElement('div');
-    tooltip.style.position = 'absolute';
-    tooltip.style.right = 'calc(100% + 10px)';
-    tooltip.style.top = '50%';
-    tooltip.style.transform = 'translateY(-50%)';
-    tooltip.style.background = 'rgba(20,20,30,0.95)';
-    tooltip.style.padding = '10px';
-    tooltip.style.borderRadius = '8px';
-    tooltip.style.width = '200px';
-    tooltip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
-    tooltip.style.display = 'none';
-    tooltip.style.zIndex = '1000';
-    tooltip.innerHTML = `
-        <div style="color:#fff;font-weight:bold;margin-bottom:5px">${tower.name}</div>
-        <div style="color:#aaa;font-size:0.9em;margin-bottom:8px">${tower.description}</div>
-        <div style="color:#88ccff">Alcance: ${tower.range}</div>
-        <div style="color:#ffaa88">Dano: ${tower.damage}</div>
-        <div style="color:#88ff88">Velocidade: ${tower.rate}</div>
-    `;
-    btn.appendChild(tooltip);
-
-    btn.onmouseover = () => { tooltip.style.display = 'block'; };
-    btn.onmouseout = () => { tooltip.style.display = 'none'; };
-    btn.onclick = () => { 
-        selectedTowerType = t; 
-        highlightTowerButtons();
-        showTowerRange(t);
-    };
-    towerBar.appendChild(btn);
-}
-document.body.appendChild(towerBar);
-function highlightTowerButtons() {
-    for (const t in towerTypes) {
-        const btn = document.getElementById('btn-tower-' + t);
-        btn.style.background = (selectedTowerType === t) ? 'linear-gradient(90deg,#44c,#66e)' : '#222';
-        btn.style.color = (selectedTowerType === t) ? '#fff' : '#bbb';
-        btn.style.boxShadow = (selectedTowerType === t) ? '0 0 8px #44c8' : '';
-        btn.style.transform = (selectedTowerType === t) ? 'scale(1.08)' : 'scale(1)';
-    }
-}
-highlightTowerButtons();
-
-// Barra inferior para status de wave/intervalo (UI moderna)
-statusBar = document.createElement('div');
-statusBar.style.position = 'absolute';
-statusBar.style.left = '50%';
-statusBar.style.transform = 'translateX(-50%)';
-statusBar.style.top = '20px';
-statusBar.style.background = 'rgba(30,30,40,0.92)';
-statusBar.style.padding = '10px 20px';
-statusBar.style.borderRadius = '12px';
-statusBar.style.color = '#fff';
-statusBar.style.display = 'none';
-statusBar.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-statusBar.style.display = 'flex';
-statusBar.style.gap = '20px';
-statusBar.style.alignItems = 'center';
-statusBar.innerHTML = `
-    <div>
-        <span style="color:#ffcc00">Base HP: </span>
-        <span id="baseHp">100</span>
-    </div>
-    <div>
-        <span style="color:#88ff88">Recursos: </span>
-        <span id="resources">500</span>
-    </div>
-    <div>
-        <span style="color:#ff88ff">Wave: </span>
-        <span id="wave">0</span>
-    </div>
-    <div style="position:relative">
-        <span style="color:#88ccff">Próxima Wave: </span>
-        <span id="waveCountdown"></span>
-        <div id="waveProgress" style="position:absolute;bottom:-5px;left:0;height:2px;background:#88ccff;width:100%"></div>
-    </div>
-`;
-document.body.appendChild(statusBar);
-
-// Atualização do status com animações
-function updateStatus(gameState) {
-    const baseHpEl = document.getElementById('baseHp');
-    const resourcesEl = document.getElementById('resources');
-    const waveEl = document.getElementById('wave');
-    const waveCountdownEl = document.getElementById('waveCountdown');
-    const waveProgressEl = document.getElementById('waveProgress');
-
-    // Animate HP changes
-    if (baseHpEl.textContent !== gameState.baseHp.toString()) {
-        const oldHp = parseInt(baseHpEl.textContent);
-        const newHp = gameState.baseHp;
-        if (oldHp > newHp) {
-            baseHpEl.style.color = '#ff4444';
-            setTimeout(() => { baseHpEl.style.color = '#fff'; }, 500);
-        }
-        baseHpEl.textContent = newHp;
-    }
-
-    // Animate resource changes
-    if (resourcesEl.textContent !== gameState.resources.toString()) {
-        const oldRes = parseInt(resourcesEl.textContent);
-        const newRes = gameState.resources;
-        if (oldRes < newRes) {
-            resourcesEl.style.color = '#88ff88';
-            setTimeout(() => { resourcesEl.style.color = '#fff'; }, 500);
-        }
-        resourcesEl.textContent = newRes;
-    }
-
-    // Update wave info
-    waveEl.textContent = gameState.wave;
-    
-    // Wave countdown
-    const timeToNext = Math.max(0, Math.floor((gameState.intervalEnd - Date.now()) / 1000));
-    waveCountdownEl.textContent = timeToNext + 's';
-    const progress = Math.max(0, Math.min(1, timeToNext / (WAVE_INTERVAL / 1000)));
-    waveProgressEl.style.width = (progress * 100) + '%';
-    
-    if (timeToNext <= 5) {
-        waveCountdownEl.style.color = '#ff4444';
-    } else {
-        waveCountdownEl.style.color = '#fff';
-    }
-}
-
-// Acelerar tempo: envia evento ao servidor
-speedToggle.onchange = () => {
-    socket.emit('speed_toggle', { fast: speedToggle.checked });
-};
-
-// Recebe confirmação de entrada na sala
-socket.on('joined', (data) => {
-    playerId = data.playerId;
-    roomId = data.roomId;
-    infoDiv.textContent = `Sala: ${roomId} | Jogador: ${playerId}`;
+// Ensure proper resize handling
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// Recebe updates do servidor
-let resources = 0;
-let score = 0;
+// Initial scene render
+renderer.render(scene, camera);
+
+// Game objects arrays
+const enemyMeshes = [];
+const towerMeshes = [];
+
 let intervalActive = false;
 let intervalEnd = 0;
 let gameOver = false;
 let victory = false;
-
-socket.on('game_update', (data) => {
-    enemies = data.enemies;
-    baseHp = data.baseHp;
-    wave = data.wave;
-    resources = data.resources;
-    score = data.score;
-    intervalActive = data.intervalActive;
-    intervalEnd = data.intervalEnd;
-    towers = data.towers || [];
-    gameOver = data.gameOver;
-    victory = data.victory;
-    // Eventos: novas torres, upgrades, etc
-    if (data.events) {
-        for (const ev of data.events) {
-            if (ev.type === 'tower') {
-                addTower(ev);
-            }
-            if (ev.type === 'tower_upgrade') {
-                upgradeTowerVisual(ev.id, ev.level);
-            }
-        }
-    }
-});
 
 // Função para adicionar torre na cena
 function addTower(tower) {
@@ -434,6 +174,102 @@ canvas.addEventListener('click', (event) => {
     if (intersects.length > 0 && intervalActive) {
         const point = intersects[0].point;
         socket.emit('place_tower', { x: point.x, z: point.z, type: selectedTowerType });
+    }
+});
+
+// === Game Functions ===
+function startGame() {
+    mainMenu.style.display = 'none';
+    canvas.style.display = '';
+    statusBar.style.display = '';
+    isGameRunning = true;
+    nextWaveTime = Date.now() + WAVE_INTERVAL;
+    animate();
+}
+
+function spawnWave() {
+    wave++;
+    const count = 5 + Math.floor(wave * 1.5);
+    for (let i = 0; i < count; i++) {
+        setTimeout(() => {
+            const types = ['wisp', 'sombra', 'golem'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 15;
+            
+            // Create enemy data
+            const enemy = {
+                type,
+                x: Math.cos(angle) * radius,
+                z: Math.sin(angle) * radius,
+                hp: enemyTypes[type].hp,
+                currentHp: enemyTypes[type].hp,
+                speed: enemyTypes[type].speed,
+                damage: enemyTypes[type].damage,
+                reward: enemyTypes[type].reward
+            };
+            enemies.push(enemy);
+            
+            // Create enemy mesh
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(0.5),
+                new THREE.MeshPhongMaterial({ color: enemyTypes[type].color })
+            );
+            mesh.position.set(enemy.x, 0.5, enemy.z);
+            scene.add(mesh);
+            enemyMeshes.push(mesh);
+        }, i * 1000);
+    }
+    nextWaveTime = Date.now() + WAVE_INTERVAL;
+}
+
+function updateStatus() {
+    const timeToNext = Math.max(0, Math.floor((nextWaveTime - Date.now()) / 1000));
+    statusBar.innerHTML = `
+        <span style="color:#ffcc00">Base: ${baseHp}</span> |
+        <span style="color:#88ff88">Recursos: ${resources}</span> |
+        <span style="color:#ff88ff">Wave: ${wave}/10</span> |
+        <span style="color:#88ccff">Próxima wave: ${timeToNext}s</span> |
+        <span style="color:#ffff88">Score: ${score}</span>
+    `;
+}
+
+// Handle clicks for tower placement
+canvas.addEventListener('click', (event) => {
+    if (!selectedTowerType) return;
+    
+    // Calculate click position on ground
+    const rect = canvas.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera({ x, y }, camera);
+    
+    const intersects = raycaster.intersectObject(ground);
+    if (intersects.length > 0) {
+        const point = intersects[0].point;
+        if (resources >= towerTypes[selectedTowerType].cost) {
+            resources -= towerTypes[selectedTowerType].cost;
+            
+            // Create tower data
+            const tower = {
+                type: selectedTowerType,
+                x: point.x,
+                z: point.z,
+                lastShot: 0
+            };
+            towers.push(tower);
+            
+            // Create tower mesh
+            const mesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.3, 0.5, 1.5, 6),
+                new THREE.MeshPhongMaterial({ color: towerTypes[selectedTowerType].color })
+            );
+            mesh.position.set(point.x, 0.75, point.z);
+            scene.add(mesh);
+            towerMeshes.push(mesh);
+        }
     }
 });
 
@@ -507,7 +343,9 @@ function updateEnemies() {
 
 // Loop de renderização
 function animate() {
+    if (!isGameRunning) return; // Stop animation if game is not running
     requestAnimationFrame(animate);
+    
     // Remove torres antigas e redesenha todas
     for (const mesh of towerMeshes) scene.remove(mesh);
     towerMeshes.length = 0;
@@ -761,10 +599,3 @@ function updateCamera() {
     camera.lookAt(0,0,0);
 }
 updateCamera();
-
-// Responsividade
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});

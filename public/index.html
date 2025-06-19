@@ -2,33 +2,30 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Webruxo Tower Defense Multiplayer</title>
+    <title>Tower Guardians</title>
     <style>
         body { margin: 0; overflow: hidden; background: #222; }
         #info { position: absolute; top: 10px; left: 10px; color: #fff; z-index: 10; }
+        #statusBar { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(30,30,40,0.92); padding: 10px 20px; border-radius: 12px; color: #fff; display: none; }
     </style>
 </head>
 <body>
     <div id="mainMenu" style="position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:100;background:linear-gradient(135deg,#23243a 60%,#2e3c5c 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;">
         <h1 style="color:#fff;font-size:3em;font-family:sans-serif;letter-spacing:2px;text-shadow:2px 2px 8px #000;">Tower Guardians</h1>
         <button id="playBtn" style="font-size:1.5em;padding:0.6em 2em;margin:1em 0;border-radius:8px;border:none;background:#44c;color:#fff;box-shadow:0 2px 8px #000;cursor:pointer;">Jogar</button>
-        <button id="soloBtn" style="font-size:1.5em;padding:0.6em 2em;margin:0.5em 0;border-radius:8px;border:none;background:#44c;color:#fff;box-shadow:0 2px 8px #000;cursor:pointer;">Jogar Solo</button>
         <label style="color:#fff;font-size:1.1em;margin-top:1em;">Acelerar o tempo: <input type="checkbox" id="speedToggle" style="transform:scale(1.5);vertical-align:middle;" /></label>
-        <div style="color:#aaa;margin-top:2em;font-size:1em;">Protótipo cooperativo multiplayer<br>por Webruxo</div>
+        <div style="color:#aaa;margin-top:2em;font-size:1em;">Tower Defense<br>por Webruxo</div>
     </div>
     <div id="optionsMenu" style="position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:90;background:linear-gradient(135deg,#23243a 60%,#2e3c5c 100%);display:none;flex-direction:column;align-items:center;justify-content:center;">
         <h2 style="color:#fff;font-family:sans-serif;margin-bottom:1em;">Menu</h2>
         <button id="restartBtn" style="font-size:1.2em;padding:0.5em 2em;margin:0.5em;border-radius:8px;border:none;background:#44c;color:#fff;box-shadow:0 2px 8px #000;cursor:pointer;">Reiniciar</button>
         <button id="toggleSpeedBtn" style="font-size:1.2em;padding:0.5em 2em;margin:0.5em;border-radius:8px;border:none;background:#44c;color:#fff;box-shadow:0 2px 8px #000;cursor:pointer;">Alternar 2X</button>
         <button id="closeMenuBtn" style="font-size:1em;padding:0.3em 1.5em;margin-top:1.5em;border-radius:8px;border:none;background:#666;color:#fff;cursor:pointer;">Fechar</button>
-    </div>
-    <div id="info" style="display:none;">Conectando...</div>
+    </div>    <div id="statusBar"></div>
     <canvas id="gameCanvas" style="display:none;"></canvas>
-    <!-- Importa Three.js via CDN -->
+    <!-- Three.js -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js"></script>
-    <!-- Importa Socket.io client -->
-    <script src="/socket.io/socket.io.js"></script>
-    <!-- Script principal do jogo -->
+    <!-- Game script -->
     <script src="main.js"></script>
 </body>
 </html>
